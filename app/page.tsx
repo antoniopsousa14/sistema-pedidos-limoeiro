@@ -1,7 +1,46 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
 type Role = "admin" | "usuario";
+async function salvarPedidoNoBanco(cliente: any, itens: any[]) {
+  const { data: pedido, error } = await supabase
+    .from("pedidos")
+    .insert([
+      {
+        cliente: cliente.nome,
+        valor_total: itens.reduce(
+          (total, item) =>
+            total + Number(item.quantidade) * Number(item.valorUnitario),
+          0
+        ),
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Erro ao salvar pedido:", error);
+    return;
+  }
+
+  const pedidoId = pedido.id;
+
+  const itensFormatados = itens.map((item) => ({
+    pedido_id: pedidoId,
+    produto: item.produto,
+    categoria: item.categoria,
+    safra: item.safra,
+    tsi: item.tsi,
+    quantidade: Number(item.quantidade),
+    valor_unitario: Number(item.valorUnitario),
+  }));
+
+  await supabase.from("itens").insert(itensFormatados);
+
+  alert("Pedido salvo no banco!");
+}
 
 type AppUser = {
   id: number;
@@ -1728,7 +1767,7 @@ export default function Home() {
 
                 <div className="mt-4 flex gap-3">
                   <button
-                    onClick={salvarPedido}
+                    onClick={() => salvarPedidoNoBanco(clienteSelecionado, itens)}
                     className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white"
                   >
                     {pedidoEditandoId !== null ? "Atualizar pedido" : "Salvar pedido"}
