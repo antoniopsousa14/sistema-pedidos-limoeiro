@@ -614,8 +614,8 @@ export default function Home() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow">
-          <h1 className="mb-2 text-3xl font-bold text-gray-800">Login</h1>
-          <p className="mb-6 text-sm text-gray-600">
+          <h1 className="mb-2 text-3xl font-bold text-black">Login</h1>
+          <p className="mb-6 text-sm text-black">
             Entre no sistema de pedidos.
           </p>
 
@@ -641,13 +641,7 @@ export default function Home() {
               Entrar
             </button>
           </div>
-
-          <div className="mt-6 rounded-xl bg-gray-100 p-4 text-sm">
-            <p className="font-semibold">Usuário administrador padrão:</p>
-            <p>E-mail: admin@sementeslimoeiro.com.br</p>
-            <p>Senha: 123456</p>
-          </div>
-        </div>
+                </div>
       </main>
     );
   }
@@ -659,7 +653,7 @@ export default function Home() {
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
             <div>
               <h1 className="text-2xl font-bold">Sistema de Pedidos</h1>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-black">
                 Usuário: {usuarioLogado.nome} ({usuarioLogado.tipo})
               </p>
             </div>
@@ -692,7 +686,7 @@ export default function Home() {
                   className="rounded-2xl bg-white p-6 text-left shadow transition hover:-translate-y-1"
                 >
                   <h3 className="text-xl font-bold">Cadastrar novo pedido</h3>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-black">
                     Criar um novo pedido de venda.
                   </p>
                 </button>
@@ -702,7 +696,7 @@ export default function Home() {
                   className="rounded-2xl bg-white p-6 text-left shadow transition hover:-translate-y-1"
                 >
                   <h3 className="text-xl font-bold">Conferir pedidos</h3>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-black">
                     Visualizar pedidos já cadastrados.
                   </p>
                 </button>
@@ -712,7 +706,7 @@ export default function Home() {
                   className="rounded-2xl bg-white p-6 text-left shadow transition hover:-translate-y-1"
                 >
                   <h3 className="text-xl font-bold">Clientes</h3>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-black">
                     Cadastrar e consultar clientes.
                   </p>
                 </button>
@@ -723,7 +717,7 @@ export default function Home() {
                     className="rounded-2xl bg-white p-6 text-left shadow transition hover:-translate-y-1"
                   >
                     <h3 className="text-xl font-bold">Usuários</h3>
-                    <p className="mt-2 text-sm text-gray-600">
+                    <p className="mt-2 text-sm text-black">
                       Gerenciar usuários do sistema.
                     </p>
                   </button>
