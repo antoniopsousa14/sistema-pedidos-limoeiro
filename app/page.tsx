@@ -55,7 +55,7 @@ type PedidoSalvo = {
   criadoEm: string;
 };
 
-type Tela = "menu" | "novo-pedido" | "pedidos" | "clientes" | "usuarios";
+type Tela = "menu" | "novo-pedido" | "pedidos" | "clientes" | "usuarios" | "financeiro";
 
 const STORAGE_USERS = "sl_users";
 const STORAGE_CLIENTES = "sl_clientes";
@@ -843,7 +843,7 @@ export default function Home() {
             <section>
               <h2 className="mb-6 text-3xl font-bold">Painel inicial</h2>
 
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
                 <button
                   onClick={() => {
                     limparPedido();
@@ -874,6 +874,16 @@ export default function Home() {
                   <h3 className="text-xl font-bold">Clientes</h3>
                   <p className="mt-2 text-sm text-black">
                     Cadastrar e consultar clientes.
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => setTela("financeiro")}
+                  className="rounded-2xl bg-white p-6 text-left shadow transition hover:-translate-y-1"
+                >
+                  <h3 className="text-xl font-bold">Financeiro</h3>
+                  <p className="mt-2 text-sm text-black">
+                    Dar baixa nos recebimentos e acompanhar saldo.
                   </p>
                 </button>
 
@@ -1136,6 +1146,89 @@ export default function Home() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          )}
+
+          {tela === "financeiro" && (
+            <section className="space-y-6">
+              <div className="rounded-2xl bg-white p-6 shadow">
+                <h2 className="mb-4 text-2xl font-bold">Financeiro / Baixa de recebimentos</h2>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="py-2">Pedido</th>
+                        <th className="py-2">Cliente</th>
+                        <th className="py-2">Valor total</th>
+                        <th className="py-2">Recebido</th>
+                        <th className="py-2">Saldo</th>
+                        <th className="py-2">Status</th>
+                        <th className="py-2 text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pedidosVisiveis.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-4 text-center">
+                            Nenhum pedido encontrado.
+                          </td>
+                        </tr>
+                      ) : (
+                        pedidosVisiveis.map((pedido) => {
+                          const totalRecebidoPedido = pedido.parcelas.reduce(
+                            (soma, parcela) => soma + (parcela.valorPago || 0),
+                            0
+                          );
+
+                          const saldoPedido = pedido.total - totalRecebidoPedido;
+
+                          let statusPedido = "Em aberto";
+                          if (totalRecebidoPedido > 0 && totalRecebidoPedido < pedido.total) {
+                            statusPedido = "Parcial";
+                          }
+                          if (totalRecebidoPedido >= pedido.total) {
+                            statusPedido = "Quitado";
+                          }
+
+                          return (
+                            <tr key={pedido.id} className="border-b">
+                              <td className="py-2">{pedido.numeroPedido}</td>
+                              <td className="py-2">{pedido.cliente.nome}</td>
+                              <td className="py-2">{moeda(pedido.total)}</td>
+                              <td className="py-2">{moeda(totalRecebidoPedido)}</td>
+                              <td className="py-2">{moeda(saldoPedido)}</td>
+                              <td className="py-2">
+                                <span
+                                  className={
+                                    statusPedido === "Quitado"
+                                      ? "font-bold text-green-700"
+                                      : statusPedido === "Parcial"
+                                      ? "font-bold text-yellow-600"
+                                      : "font-bold text-red-600"
+                                  }
+                                >
+                                  {statusPedido}
+                                </span>
+                              </td>
+                              <td className="py-2">
+                                <div className="flex justify-center gap-2">
+                                  <button
+                                    onClick={() => editarPedido(pedido)}
+                                    className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700"
+                                  >
+                                    Abrir financeiro
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
           )}
@@ -1661,13 +1754,13 @@ export default function Home() {
           <div className="mb-5 border-b pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-  <Image
-    src="/logo.png"
-    width={180}
-    height={80}
-    alt="Logo"
-    priority
-  />
+                <Image
+                  src="/logo.png"
+                  width={180}
+                  height={80}
+                  alt="Logo"
+                  priority
+                />
 
                 <div className="text-[11px] leading-tight">
                   <div className="font-bold text-sm">
