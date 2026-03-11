@@ -4,43 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type Role = "admin" | "usuario";
-async function salvarPedidoNoBanco(cliente: any, itens: any[]) {
-  const { data: pedido, error } = await supabase
-    .from("pedidos")
-    .insert([
-      {
-        cliente: cliente.nome,
-        valor_total: itens.reduce(
-          (total, item) =>
-            total + Number(item.quantidade) * Number(item.valorUnitario),
-          0
-        ),
-      },
-    ])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Erro ao salvar pedido:", error);
-    return;
-  }
-
-  const pedidoId = pedido.id;
-
-  const itensFormatados = itens.map((item) => ({
-    pedido_id: pedidoId,
-    produto: item.produto,
-    categoria: item.categoria,
-    safra: item.safra,
-    tsi: item.tsi,
-    quantidade: Number(item.quantidade),
-    valor_unitario: Number(item.valorUnitario),
-  }));
-
-  await supabase.from("itens").insert(itensFormatados);
-
-  alert("Pedido salvo no banco!");
-}
 
 type AppUser = {
   id: number;
@@ -92,11 +55,16 @@ type PedidoSalvo = {
   criadoEm: string;
 };
 
-type Tela = "menu" | "novo-pedido" | "pedidos" | "clientes" | "usuarios" | "financeiro";
+type Tela =
+  | "menu"
+  | "novo-pedido"
+  | "pedidos"
+  | "clientes"
+  | "usuarios"
+  | "financeiro";
 
 const STORAGE_USERS = "sl_users";
 const STORAGE_CLIENTES = "sl_clientes";
-const STORAGE_PEDIDOS = "sl_pedidos";
 const STORAGE_USER_LOGADO = "sl_user_logado";
 
 const opcoesProdutos = [
@@ -209,7 +177,9 @@ export default function Home() {
   const [clienteFormIe, setClienteFormIe] = useState("");
   const [clienteFormEndereco, setClienteFormEndereco] = useState("");
   const [clienteFormWhatsapp, setClienteFormWhatsapp] = useState("");
-  const [clienteEditandoId, setClienteEditandoId] = useState<number | null>(null);
+  const [clienteEditandoId, setClienteEditandoId] = useState<number | null>(
+    null
+  );
   const [buscaCliente, setBuscaCliente] = useState("");
 
   const [numeroPedidoInicial, setNumeroPedidoInicial] = useState("1234");
@@ -234,39 +204,82 @@ export default function Home() {
   const [vendedor, setVendedor] = useState("");
 
   const [itens, setItens] = useState<ItemPedido[]>([criarItemVazio()]);
-  const [parcelas, setParcelas] = useState<Parcela[]>([criarParcelaVazia("100")]);
+  const [parcelas, setParcelas] = useState<Parcela[]>([
+    criarParcelaVazia("100"),
+  ]);
 
   const [pedidoEditandoId, setPedidoEditandoId] = useState<number | null>(null);
 
+  const numeroPedidoCompleto = `${numeroPedidoInicial}${sufixoPedidoFixo}`;
+
+  async function carregarPedidos() {
+    const { data, error } = await supabase
+      .from("pedidos")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (error) {
+      console.error("Erro ao carregar pedidos:", error);
+      setPedidos([]);
+      return;
+    }
+
+    const pedidosFormatados: PedidoSalvo[] = (data || []).map((pedido: any) => ({
+      id: Number(pedido.id),
+      numeroPedido: pedido.numero_pedido || "",
+      dataEmissao: pedido.data
+        ? new Date(pedido.data).toLocaleDateString("pt-BR")
+        : "",
+      vendedor: pedido.vendedor || "",
+      cliente: (pedido.cliente_json as Cliente) || {
+        id: 0,
+        nome: pedido.cliente || "",
+        cnpj: "",
+        inscricaoEstadual: "",
+        endereco: "",
+        whatsapp: "",
+      },
+      itens: (pedido.itens_json as ItemPedido[]) || [],
+      parcelas: (pedido.parcelas_json as Parcela[]) || [],
+      total: Number(pedido.valor_total || 0),
+      criadoPorId: Number(pedido.criado_por_id || 0),
+      criadoPorNome: pedido.criado_por_nome || "",
+      criadoEm: pedido.criado_em || "",
+    }));
+
+    setPedidos(pedidosFormatados);
+  }
+
   useEffect(() => {
-    const usersSalvos = localStorage.getItem(STORAGE_USERS);
-    const clientesSalvos = localStorage.getItem(STORAGE_CLIENTES);
-    const pedidosSalvos = localStorage.getItem(STORAGE_PEDIDOS);
-    const userLogadoSalvo = localStorage.getItem(STORAGE_USER_LOGADO);
+    async function iniciar() {
+      const usersSalvos = localStorage.getItem(STORAGE_USERS);
+      const clientesSalvos = localStorage.getItem(STORAGE_CLIENTES);
+      const userLogadoSalvo = localStorage.getItem(STORAGE_USER_LOGADO);
 
-    const baseUsuarios = usersSalvos ? JSON.parse(usersSalvos) : usuariosPadrao;
-    const baseClientes = clientesSalvos ? JSON.parse(clientesSalvos) : clientesPadrao;
-    const basePedidos = pedidosSalvos ? JSON.parse(pedidosSalvos) : [];
+      const baseUsuarios = usersSalvos ? JSON.parse(usersSalvos) : usuariosPadrao;
+      const baseClientes = clientesSalvos
+        ? JSON.parse(clientesSalvos)
+        : clientesPadrao;
 
-    setUsuarios(baseUsuarios);
-    setClientes(baseClientes);
-    setPedidos(basePedidos);
+      setUsuarios(baseUsuarios);
+      setClientes(baseClientes);
 
-    if (userLogadoSalvo) {
-      setUsuarioLogado(JSON.parse(userLogadoSalvo));
+      if (userLogadoSalvo) {
+        setUsuarioLogado(JSON.parse(userLogadoSalvo));
+      }
+
+      if (!usersSalvos) {
+        localStorage.setItem(STORAGE_USERS, JSON.stringify(usuariosPadrao));
+      }
+      if (!clientesSalvos) {
+        localStorage.setItem(STORAGE_CLIENTES, JSON.stringify(clientesPadrao));
+      }
+
+      await carregarPedidos();
+      setCarregado(true);
     }
 
-    if (!usersSalvos) {
-      localStorage.setItem(STORAGE_USERS, JSON.stringify(usuariosPadrao));
-    }
-    if (!clientesSalvos) {
-      localStorage.setItem(STORAGE_CLIENTES, JSON.stringify(clientesPadrao));
-    }
-    if (!pedidosSalvos) {
-      localStorage.setItem(STORAGE_PEDIDOS, JSON.stringify([]));
-    }
-
-    setCarregado(true);
+    iniciar();
   }, []);
 
   useEffect(() => {
@@ -281,19 +294,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!carregado) return;
-    localStorage.setItem(STORAGE_PEDIDOS, JSON.stringify(pedidos));
-  }, [pedidos, carregado]);
-
-  useEffect(() => {
-    if (!carregado) return;
     if (usuarioLogado) {
       localStorage.setItem(STORAGE_USER_LOGADO, JSON.stringify(usuarioLogado));
     } else {
       localStorage.removeItem(STORAGE_USER_LOGADO);
     }
   }, [usuarioLogado, carregado]);
-
-  const numeroPedidoCompleto = `${numeroPedidoInicial}${sufixoPedidoFixo}`;
 
   function limparFormularioCliente() {
     setClienteFormNome("");
@@ -333,7 +339,10 @@ export default function Home() {
   }, [itens]);
 
   const totalPercentualParcelas = useMemo(() => {
-    return parcelas.reduce((soma, parcela) => soma + numero(parcela.percentual), 0);
+    return parcelas.reduce(
+      (soma, parcela) => soma + numero(parcela.percentual),
+      0
+    );
   }, [parcelas]);
 
   const totalPago = useMemo(() => {
@@ -600,7 +609,11 @@ export default function Home() {
     setParcelas((anterior) => anterior.filter((parcela) => parcela.id !== id));
   }
 
-  function atualizarParcela(id: number, campo: keyof Parcela, valor: string | number) {
+  function atualizarParcela(
+    id: number,
+    campo: keyof Parcela,
+    valor: string | number
+  ) {
     setParcelas((anterior) =>
       anterior.map((parcela) =>
         parcela.id === id ? { ...parcela, [campo]: valor } : parcela
@@ -706,7 +719,7 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function salvarPedido() {
+  async function salvarPedidoNoBanco() {
     if (!usuarioLogado) {
       alert("Faça login.");
       return;
@@ -748,46 +761,49 @@ export default function Home() {
       whatsapp,
     };
 
+    const payload = {
+      numero_pedido: numeroPedidoCompleto,
+      cliente: clienteDoPedido.nome,
+      data: new Date().toISOString(),
+      valor_total: totalGeral,
+      vendedor,
+      cliente_json: clienteDoPedido,
+      itens_json: itens,
+      parcelas_json: parcelas,
+      criado_por_id: usuarioLogado.id,
+      criado_por_nome: usuarioLogado.nome,
+      criado_em: new Date().toLocaleString("pt-BR"),
+    };
+
     if (pedidoEditandoId !== null) {
-      setPedidos((anterior) =>
-        anterior.map((pedido) =>
-          pedido.id === pedidoEditandoId
-            ? {
-                ...pedido,
-                numeroPedido: numeroPedidoCompleto,
-                dataEmissao: dataAtual,
-                vendedor,
-                cliente: clienteDoPedido,
-                itens,
-                parcelas,
-                total: totalGeral,
-              }
-            : pedido
-        )
-      );
+      const { error } = await supabase
+        .from("pedidos")
+        .update(payload)
+        .eq("id", pedidoEditandoId);
+
+      if (error) {
+        console.error("Erro ao atualizar pedido:", error);
+        alert("Erro ao atualizar pedido.");
+        return;
+      }
 
       alert("Pedido atualizado com sucesso.");
+      await carregarPedidos();
       limparPedido();
       setTela("pedidos");
       return;
     }
 
-    const pedido: PedidoSalvo = {
-      id: Date.now(),
-      numeroPedido: numeroPedidoCompleto,
-      dataEmissao: dataAtual,
-      vendedor,
-      cliente: clienteDoPedido,
-      itens,
-      parcelas,
-      total: totalGeral,
-      criadoPorId: usuarioLogado.id,
-      criadoPorNome: usuarioLogado.nome,
-      criadoEm: new Date().toLocaleString("pt-BR"),
-    };
+    const { error } = await supabase.from("pedidos").insert([payload]);
 
-    setPedidos((anterior) => [pedido, ...anterior]);
+    if (error) {
+      console.error("Erro ao salvar pedido:", error);
+      alert("Erro ao salvar pedido.");
+      return;
+    }
+
     alert("Pedido salvo com sucesso.");
+    await carregarPedidos();
     limparPedido();
     setTela("pedidos");
   }
@@ -1190,7 +1206,9 @@ export default function Home() {
           {tela === "financeiro" && (
             <section className="space-y-6">
               <div className="rounded-2xl bg-white p-6 shadow">
-                <h2 className="mb-4 text-2xl font-bold">Financeiro / Baixa de recebimentos</h2>
+                <h2 className="mb-4 text-2xl font-bold">
+                  Financeiro / Baixa de recebimentos
+                </h2>
 
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-sm">
@@ -1222,7 +1240,10 @@ export default function Home() {
                           const saldoPedido = pedido.total - totalRecebidoPedido;
 
                           let statusPedido = "Em aberto";
-                          if (totalRecebidoPedido > 0 && totalRecebidoPedido < pedido.total) {
+                          if (
+                            totalRecebidoPedido > 0 &&
+                            totalRecebidoPedido < pedido.total
+                          ) {
                             statusPedido = "Parcial";
                           }
                           if (totalRecebidoPedido >= pedido.total) {
@@ -1767,7 +1788,7 @@ export default function Home() {
 
                 <div className="mt-4 flex gap-3">
                   <button
-                    onClick={() => salvarPedidoNoBanco(clienteSelecionado, itens)}
+                    onClick={salvarPedidoNoBanco}
                     className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white"
                   >
                     {pedidoEditandoId !== null ? "Atualizar pedido" : "Salvar pedido"}
@@ -1792,13 +1813,13 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img
-  src="/logo.png"
-  alt="Logo"
-  className="h-16 w-auto object-contain"
-/>
+                  src="/logo.png"
+                  alt="Logo"
+                  className="h-16 w-auto object-contain"
+                />
 
                 <div className="text-[11px] leading-tight">
-                  <div className="font-bold text-sm">
+                  <div className="text-sm font-bold">
                     AGROPECUARIA LIMOEIRO E PILOES LTDA
                   </div>
 
@@ -1810,8 +1831,8 @@ export default function Home() {
             </div>
           </div>
 
-<div className="mb-4 grid grid-cols-2 py-2 text-center">
-              <div>
+          <div className="mb-4 grid grid-cols-2 py-2 text-center">
+            <div>
               Pedido <strong>{numeroPedidoCompleto}</strong>
             </div>
             <div>
@@ -1936,39 +1957,43 @@ export default function Home() {
 
           <div className="mt-8 text-justify text-[12px] leading-5">
             <p>
-              Para efetuar a retirada, bastará ao COMPRADOR remeter - com 48 horas de
-              antecedência em relação à data do carregamento - via e-mail, ao VENDEDOR,
-              uma Autorização de Carga, na qual deverão constar os dados do veículo que
-              transportará a mercadoria e os dados do motorista, além da autorização
-              expressa para que as sementes sejam entregues àquele transportador.
+              Para efetuar a retirada, bastará ao COMPRADOR remeter - com 48 horas
+              de antecedência em relação à data do carregamento - via e-mail, ao
+              VENDEDOR, uma Autorização de Carga, na qual deverão constar os dados
+              do veículo que transportará a mercadoria e os dados do motorista,
+              além da autorização expressa para que as sementes sejam entregues
+              àquele transportador.
             </p>
 
             <p className="mt-4 font-bold">Condições Gerais</p>
 
             <p className="mt-2">
-              As sementes, por serem organismos vivos, carecem de cuidados especiais no
-              seu transporte, na sua guarda, no seu manuseio e no seu uso, estando
-              sujeitas a danos caso sejam erroneamente transportadas ou acondicionadas.
-              O COMPRADOR deverá seguir rigorosamente os preceitos técnicos indicados
-              pelo engenheiro agrônomo responsável, bem como aqueles comuns na
-              agricultura, para cada tipo de semente adquirida. Em caso de retirada na
-              fazenda Limoeiro e Pilões (F. O. B.), a mercadoria viajará por conta e risco
-              do COMPRADOR. Solicitamos que se faça teste de germinação para aferir a
-              qualidade das sementes antes do plantio definitivo no campo. Reclamações
+              As sementes, por serem organismos vivos, carecem de cuidados
+              especiais no seu transporte, na sua guarda, no seu manuseio e no seu
+              uso, estando sujeitas a danos caso sejam erroneamente transportadas
+              ou acondicionadas. O COMPRADOR deverá seguir rigorosamente os
+              preceitos técnicos indicados pelo engenheiro agrônomo responsável, bem
+              como aqueles comuns na agricultura, para cada tipo de semente
+              adquirida. Em caso de retirada na fazenda Limoeiro e Pilões (F. O.
+              B.), a mercadoria viajará por conta e risco do COMPRADOR.
+              Solicitamos que se faça teste de germinação para aferir a qualidade
+              das sementes antes do plantio definitivo no campo. Reclamações
               somente serão aceitas quando efetuadas por escrito, acompanhadas de
-              Boletim de Análise de Sementes emitido em laboratório credenciado pelo MAPA
-              - Ministério da Agricultura, Pecuária e Abastecimento. A análise deverá ser
-              realizada até 15 (quinze) dias após a retirada da mercadoria, e sempre
-              antes do plantio definitivo no campo. Caso haja sementes que não
-              correspondam aos padrões exigidos por lei, a responsabilidade do VENDEDOR
-              limita-se à substituição dos fardos - aqueles pertencentes aos lotes que
-              comprovadamente apresentarem problemas - por outros que estejam dentro do
-              padrão de qualidade exigida pelo MAPA; ou, na impossibilidade de substituição,
-              na devolução do valor pago acrescido de correção monetária. Em qualquer dos
-              casos, as sementes devolvidas deverão ser entregues em suas embalagens
-              originais lacradas e não danificadas. Pedido sujeito a aprovação de crédito.
-              Em caso de não pagamento no prazo estipulado, este pedido poderá ser
-              cancelado sem prévio aviso. Se cancelado o pedido, o cliente perderá o sinal pago.
+              Boletim de Análise de Sementes emitido em laboratório credenciado
+              pelo MAPA - Ministério da Agricultura, Pecuária e Abastecimento. A
+              análise deverá ser realizada até 15 (quinze) dias após a retirada da
+              mercadoria, e sempre antes do plantio definitivo no campo. Caso haja
+              sementes que não correspondam aos padrões exigidos por lei, a
+              responsabilidade do VENDEDOR limita-se à substituição dos fardos -
+              aqueles pertencentes aos lotes que comprovadamente apresentarem
+              problemas - por outros que estejam dentro do padrão de qualidade
+              exigida pelo MAPA; ou, na impossibilidade de substituição, na
+              devolução do valor pago acrescido de correção monetária. Em qualquer
+              dos casos, as sementes devolvidas deverão ser entregues em suas
+              embalagens originais lacradas e não danificadas. Pedido sujeito a
+              aprovação de crédito. Em caso de não pagamento no prazo estipulado,
+              este pedido poderá ser cancelado sem prévio aviso. Se cancelado o
+              pedido, o cliente perderá o sinal pago.
             </p>
 
             <p className="mt-4">
