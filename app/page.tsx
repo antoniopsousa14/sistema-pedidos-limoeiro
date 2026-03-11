@@ -621,14 +621,14 @@ export default function Home() {
 
           <div className="space-y-4">
             <input
-              className="w-full rounded-xl border p-3"
+              className="w-full rounded-xl border p-3 text-black placeholder-black"
               placeholder="E-mail"
               value={loginEmail}
               onChange={(e) => setLoginEmail(e.target.value)}
             />
             <input
               type="password"
-              className="w-full rounded-xl border p-3"
+              className="w-full rounded-xl border p-3 text-black placeholder-black"
               placeholder="Senha"
               value={loginSenha}
               onChange={(e) => setLoginSenha(e.target.value)}
