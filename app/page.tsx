@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 
 type Role = "admin" | "usuario";
 
@@ -1660,7 +1661,12 @@ export default function Home() {
           <div className="mb-5 border-b pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img src="/logo.png" className="h-12" alt="Logo" />
+                <Image
+  src="/logo.png"
+  width={140}
+  height={60}
+  alt="Logo"
+/>
 
                 <div className="text-[11px] leading-tight">
                   <div className="font-bold text-sm">
