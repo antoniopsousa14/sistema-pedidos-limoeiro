@@ -1771,8 +1771,8 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mb-4 grid grid-cols-2 border-y py-2 text-center">
-            <div>
+<div className="mb-4 grid grid-cols-2 border-t py-2 text-center">
+              <div>
               Pedido <strong>{numeroPedidoCompleto}</strong>
             </div>
             <div>
