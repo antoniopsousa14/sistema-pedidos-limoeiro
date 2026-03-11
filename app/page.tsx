@@ -1367,18 +1367,31 @@ export default function Home() {
       {tela === "novo-pedido" && (
         <section className="mx-auto mt-6 max-w-[1000px] bg-white p-5 shadow print:max-w-none print:shadow-none">
           <div className="mb-5 border-b pb-4">
-            <h1 className="text-center text-2xl font-bold uppercase">
-              AGROPECUARIA LIMOEIRO E PILOES LTDA
-            </h1>
-            <p className="text-center text-sm">
-              CNPJ: 46.272.036/0001-25 | I.E. 0043338680040 | RENASEM MG-16443/2022
-            </p>
-            <p className="text-center text-sm">
-              Produção: Fazenda Limoeiro e Piloes KM 76, nº 0, Zona Rural Guarda-Mor - MG
-            </p>
-            <p className="text-center text-sm">
-              Escritório: Fazenda Limoeiro e Piloes KM 76, nº 0, Centro Guarda-Mor - MG
-            </p>
+            <div className="flex items-center justify-between">
+
+  <div className="flex items-center gap-3">
+    <img src="/logo.png" className="h-12" />
+
+    <div className="text-[11px] leading-tight">
+      <div className="font-bold text-sm">
+        AGROPECUARIA LIMOEIRO E PILOES LTDA
+      </div>
+
+      <div>
+        CNPJ: 46.272.036/0001-25 | IE: 0043338680040
+      </div>
+
+      <div>
+        RENASEM MG-16443/2022
+      </div>
+
+      <div>
+        Fazenda Limoeiro e Pilões KM 76 – Guarda-Mor MG
+      </div>
+    </div>
+  </div>
+
+</div>
           </div>
 
           <div className="mb-4 grid grid-cols-2 border-y py-2 text-center">
