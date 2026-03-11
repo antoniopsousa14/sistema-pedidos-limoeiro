@@ -35,6 +35,9 @@ type Parcela = {
   id: number;
   percentual: string;
   vencimento: string;
+  valorPago: number;
+  dataPagamento: string;
+  formaPagamento: string;
 };
 
 type PedidoSalvo = {
@@ -139,6 +142,9 @@ function criarParcelaVazia(percentual = ""): Parcela {
     id: Date.now() + Math.floor(Math.random() * 1000),
     percentual,
     vencimento: "",
+    valorPago: 0,
+    dataPagamento: "",
+    formaPagamento: "",
   };
 }
 
@@ -292,6 +298,14 @@ export default function Home() {
     return parcelas.reduce((soma, parcela) => soma + numero(parcela.percentual), 0);
   }, [parcelas]);
 
+  const totalPago = useMemo(() => {
+    return parcelas.reduce((soma, parcela) => soma + (parcela.valorPago || 0), 0);
+  }, [parcelas]);
+
+  const saldoAberto = useMemo(() => {
+    return totalGeral - totalPago;
+  }, [totalGeral, totalPago]);
+
   const clientesFiltrados = useMemo(() => {
     const termo = buscaCliente.trim().toLowerCase();
 
@@ -310,6 +324,26 @@ export default function Home() {
 
   function valorParcela(percentual: string) {
     return totalGeral * (numero(percentual) / 100);
+  }
+
+  function valorParcelaPorTotal(totalPedido: number, percentual: string) {
+    return totalPedido * (numero(percentual) / 100);
+  }
+
+  function statusParcela(parcela: Parcela, totalPedido: number) {
+    const valorDaParcela = valorParcelaPorTotal(totalPedido, parcela.percentual);
+    const pago = parcela.valorPago || 0;
+
+    if (pago <= 0) return "Em aberto";
+    if (pago < valorDaParcela) return "Parcial";
+    return "Quitado";
+  }
+
+  function corStatusParcela(parcela: Parcela, totalPedido: number) {
+    const status = statusParcela(parcela, totalPedido);
+    if (status === "Quitado") return "text-green-700";
+    if (status === "Parcial") return "text-yellow-600";
+    return "text-red-600";
   }
 
   function fazerLogin() {
@@ -528,10 +562,67 @@ export default function Home() {
     setParcelas((anterior) => anterior.filter((parcela) => parcela.id !== id));
   }
 
-  function atualizarParcela(id: number, campo: keyof Parcela, valor: string) {
+  function atualizarParcela(id: number, campo: keyof Parcela, valor: string | number) {
     setParcelas((anterior) =>
       anterior.map((parcela) =>
         parcela.id === id ? { ...parcela, [campo]: valor } : parcela
+      )
+    );
+  }
+
+  function registrarRecebimento(idParcela: number) {
+    const parcela = parcelas.find((p) => p.id === idParcela);
+    if (!parcela) return;
+
+    const valorDaParcela = valorParcela(parcela.percentual);
+    const saldoAtual = valorDaParcela - (parcela.valorPago || 0);
+
+    const data = prompt(
+      "Data do recebimento (ex: 20/03/2026):",
+      new Date().toLocaleDateString("pt-BR")
+    );
+    if (!data) return;
+
+    const valorTexto = prompt(
+      `Valor recebido desta parcela.\nSaldo atual: ${moeda(saldoAtual)}`,
+      saldoAtual > 0 ? saldoAtual.toFixed(2).replace(".", ",") : "0"
+    );
+    if (!valorTexto) return;
+
+    const valorRecebido = numero(valorTexto);
+
+    if (valorRecebido <= 0) {
+      alert("Informe um valor válido.");
+      return;
+    }
+
+    const forma = prompt(
+      "Forma de pagamento (PIX, TED, Boleto, Dinheiro, Outro):",
+      parcela.formaPagamento || "PIX"
+    );
+    if (!forma) return;
+
+    atualizarParcela(idParcela, "valorPago", (parcela.valorPago || 0) + valorRecebido);
+    atualizarParcela(idParcela, "dataPagamento", data);
+    atualizarParcela(idParcela, "formaPagamento", forma);
+  }
+
+  function estornarRecebimento(idParcela: number) {
+    const confirmar = window.confirm(
+      "Tem certeza que deseja zerar o recebimento desta parcela?"
+    );
+    if (!confirmar) return;
+
+    setParcelas((anterior) =>
+      anterior.map((parcela) =>
+        parcela.id === idParcela
+          ? {
+              ...parcela,
+              valorPago: 0,
+              dataPagamento: "",
+              formaPagamento: "",
+            }
+          : parcela
       )
     );
   }
@@ -564,7 +655,14 @@ export default function Home() {
 
     setVendedor(pedido.vendedor);
     setItens(pedido.itens);
-    setParcelas(pedido.parcelas);
+    setParcelas(
+      pedido.parcelas.map((parcela) => ({
+        ...parcela,
+        valorPago: parcela.valorPago || 0,
+        dataPagamento: parcela.dataPagamento || "",
+        formaPagamento: parcela.formaPagamento || "",
+      }))
+    );
 
     setTela("novo-pedido");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -678,9 +776,7 @@ export default function Home() {
       <main className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow">
           <h1 className="mb-2 text-3xl font-bold text-black">Login</h1>
-          <p className="mb-6 text-sm text-black">
-            Entre no sistema de pedidos.
-          </p>
+          <p className="mb-6 text-sm text-black">Entre no sistema de pedidos.</p>
 
           <div className="space-y-4">
             <input
@@ -1368,61 +1464,128 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-4">
-                  {parcelas.map((parcela, index) => (
-                    <div key={parcela.id} className="rounded-xl border p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <h3 className="font-bold">Parcela {index + 1}</h3>
-                        <button
-                          type="button"
-                          onClick={() => removerParcela(parcela.id)}
-                          className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white"
-                        >
-                          Remover
-                        </button>
-                      </div>
+                  {parcelas.map((parcela, index) => {
+                    const valorDaParcela = valorParcela(parcela.percentual);
+                    const saldoDaParcela = valorDaParcela - (parcela.valorPago || 0);
+                    const status = statusParcela(parcela, totalGeral);
+                    const corStatus = corStatusParcela(parcela, totalGeral);
 
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <div className="flex overflow-hidden rounded border">
+                    return (
+                      <div key={parcela.id} className="rounded-xl border p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <h3 className="font-bold">Parcela {index + 1}</h3>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => registrarRecebimento(parcela.id)}
+                              className="rounded bg-green-600 px-3 py-1 text-sm font-semibold text-white"
+                            >
+                              Lançar recebimento
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => estornarRecebimento(parcela.id)}
+                              className="rounded bg-yellow-600 px-3 py-1 text-sm font-semibold text-white"
+                            >
+                              Estornar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removerParcela(parcela.id)}
+                              className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                          <div className="flex overflow-hidden rounded border">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="flex-1 px-3 py-3 outline-none"
+                              placeholder="Percentual"
+                              value={parcela.percentual}
+                              onChange={(e) =>
+                                atualizarParcela(
+                                  parcela.id,
+                                  "percentual",
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <span className="flex items-center bg-gray-100 px-3 py-3 font-semibold">
+                              %
+                            </span>
+                          </div>
+
                           <input
-                            type="number"
-                            step="0.01"
-                            className="flex-1 px-3 py-3 outline-none"
-                            placeholder="Percentual"
-                            value={parcela.percentual}
+                            className="rounded border p-3"
+                            placeholder="Vencimento"
+                            value={parcela.vencimento}
                             onChange={(e) =>
                               atualizarParcela(
                                 parcela.id,
-                                "percentual",
+                                "vencimento",
                                 e.target.value
                               )
                             }
                           />
-                          <span className="flex items-center bg-gray-100 px-3 py-3 font-semibold">
-                            %
-                          </span>
+
+                          <input
+                            className="rounded border bg-gray-100 p-3 font-semibold"
+                            value={moeda(valorDaParcela)}
+                            readOnly
+                          />
                         </div>
 
-                        <input
-                          className="rounded border p-3"
-                          placeholder="Vencimento"
-                          value={parcela.vencimento}
-                          onChange={(e) =>
-                            atualizarParcela(
-                              parcela.id,
-                              "vencimento",
-                              e.target.value
-                            )
-                          }
-                        />
+                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <div className="text-xs font-semibold text-gray-600">
+                              Recebido
+                            </div>
+                            <div className="mt-1 font-bold">
+                              {moeda(parcela.valorPago || 0)}
+                            </div>
+                          </div>
 
-                        <input
-                          className="rounded border bg-gray-100 p-3 font-semibold"
-                          value={moeda(valorParcela(parcela.percentual))}
-                          readOnly
-                        />
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <div className="text-xs font-semibold text-gray-600">
+                              Saldo
+                            </div>
+                            <div className="mt-1 font-bold">
+                              {moeda(saldoDaParcela)}
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <div className="text-xs font-semibold text-gray-600">
+                              Data pagamento
+                            </div>
+                            <div className="mt-1 font-bold">
+                              {parcela.dataPagamento || "-"}
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <div className="text-xs font-semibold text-gray-600">
+                              Forma
+                            </div>
+                            <div className="mt-1 font-bold">
+                              {parcela.formaPagamento || "-"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <span className={`font-bold ${corStatus}`}>
+                            Status: {status}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="mt-4 rounded-xl bg-gray-100 p-4">
@@ -1440,6 +1603,35 @@ export default function Home() {
                       ? "Percentual total correto."
                       : "A soma dos percentuais deve fechar em 100%."}
                   </p>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="rounded-xl bg-blue-50 p-4">
+                    <div className="text-sm font-semibold text-blue-900">
+                      Total do pedido
+                    </div>
+                    <div className="mt-1 text-2xl font-bold text-blue-900">
+                      {moeda(totalGeral)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-green-50 p-4">
+                    <div className="text-sm font-semibold text-green-900">
+                      Total recebido
+                    </div>
+                    <div className="mt-1 text-2xl font-bold text-green-900">
+                      {moeda(totalPago)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-red-50 p-4">
+                    <div className="text-sm font-semibold text-red-900">
+                      Saldo em aberto
+                    </div>
+                    <div className="mt-1 text-2xl font-bold text-red-900">
+                      {moeda(saldoAberto)}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-4 flex gap-3">
@@ -1476,9 +1668,7 @@ export default function Home() {
                   </div>
 
                   <div>CNPJ: 46.272.036/0001-25 | IE: 0043338680040</div>
-
                   <div>RENASEM MG-16443/2022</div>
-
                   <div>Fazenda Limoeiro e Pilões KM 76 – Guarda-Mor MG</div>
                 </div>
               </div>
@@ -1560,20 +1750,32 @@ export default function Home() {
                   <th className="py-2">Parcela</th>
                   <th className="py-2">Percentual</th>
                   <th className="py-2">Vencimento</th>
-                  <th className="py-2">Valor (R$)</th>
+                  <th className="py-2">Valor Parcela</th>
+                  <th className="py-2">Valor Pago</th>
+                  <th className="py-2">Saldo</th>
+                  <th className="py-2">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {parcelas.map((parcela, index) => (
-                  <tr key={parcela.id} className="border-b text-center">
-                    <td className="py-2">{index + 1}</td>
-                    <td className="py-2">
-                      {numero(parcela.percentual).toFixed(2)}%
-                    </td>
-                    <td className="py-2">{parcela.vencimento}</td>
-                    <td className="py-2">{moeda(valorParcela(parcela.percentual))}</td>
-                  </tr>
-                ))}
+                {parcelas.map((parcela, index) => {
+                  const valorDaParcela = valorParcela(parcela.percentual);
+                  const saldoDaParcela = valorDaParcela - (parcela.valorPago || 0);
+                  const status = statusParcela(parcela, totalGeral);
+
+                  return (
+                    <tr key={parcela.id} className="border-b text-center">
+                      <td className="py-2">{index + 1}</td>
+                      <td className="py-2">
+                        {numero(parcela.percentual).toFixed(2)}%
+                      </td>
+                      <td className="py-2">{parcela.vencimento}</td>
+                      <td className="py-2">{moeda(valorDaParcela)}</td>
+                      <td className="py-2">{moeda(parcela.valorPago || 0)}</td>
+                      <td className="py-2">{moeda(saldoDaParcela)}</td>
+                      <td className="py-2">{status}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1584,15 +1786,15 @@ export default function Home() {
               <div>{parcelas.length}</div>
             </div>
             <div>
-              <div className="font-bold">Soma Percentuais</div>
-              <div>{totalPercentualParcelas.toFixed(2)}%</div>
+              <div className="font-bold">Total Recebido</div>
+              <div>{moeda(totalPago)}</div>
             </div>
             <div>
-              <div className="font-bold">Valor (R$)</div>
-              <div>{moeda(totalGeral)}</div>
+              <div className="font-bold">Saldo em Aberto</div>
+              <div>{moeda(saldoAberto)}</div>
             </div>
             <div>
-              <div className="font-bold">Valor Total do Pedido (R$)</div>
+              <div className="font-bold">Valor Total do Pedido</div>
               <div className="font-bold">{moeda(totalGeral)}</div>
             </div>
           </div>
