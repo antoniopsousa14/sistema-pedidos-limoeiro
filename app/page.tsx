@@ -192,6 +192,8 @@ export default function Home() {
   const [itens, setItens] = useState<ItemPedido[]>([criarItemVazio()]);
   const [parcelas, setParcelas] = useState<Parcela[]>([criarParcelaVazia("100")]);
 
+  const [pedidoEditandoId, setPedidoEditandoId] = useState<number | null>(null);
+
   useEffect(() => {
     const usersSalvos = localStorage.getItem(STORAGE_USERS);
     const clientesSalvos = localStorage.getItem(STORAGE_CLIENTES);
@@ -259,6 +261,7 @@ export default function Home() {
   }
 
   function limparPedido() {
+    setPedidoEditandoId(null);
     setNumeroPedidoInicial("1234");
     setClienteSelecionadoId("");
     setModoNovoClienteNoPedido(false);
@@ -533,6 +536,40 @@ export default function Home() {
     );
   }
 
+  function editarPedido(pedido: PedidoSalvo) {
+    if (!usuarioLogado) return;
+
+    const podeEditar =
+      usuarioLogado.tipo === "admin" || usuarioLogado.id === pedido.criadoPorId;
+
+    if (!podeEditar) {
+      alert("Você não tem permissão para editar este pedido.");
+      return;
+    }
+
+    const numeroSemSufixo = pedido.numeroPedido.endsWith(sufixoPedidoFixo)
+      ? pedido.numeroPedido.replace(sufixoPedidoFixo, "")
+      : pedido.numeroPedido;
+
+    setPedidoEditandoId(pedido.id);
+    setNumeroPedidoInicial(numeroSemSufixo);
+    setClienteSelecionadoId(String(pedido.cliente.id));
+    setModoNovoClienteNoPedido(false);
+
+    setNomeCliente(pedido.cliente.nome);
+    setCnpj(pedido.cliente.cnpj);
+    setInscricaoEstadual(pedido.cliente.inscricaoEstadual);
+    setEndereco(pedido.cliente.endereco);
+    setWhatsapp(pedido.cliente.whatsapp);
+
+    setVendedor(pedido.vendedor);
+    setItens(pedido.itens);
+    setParcelas(pedido.parcelas);
+
+    setTela("novo-pedido");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function salvarPedido() {
     if (!usuarioLogado) {
       alert("Faça login.");
@@ -563,22 +600,48 @@ export default function Home() {
       return;
     }
 
+    const clienteDoPedido: Cliente = {
+      id:
+        clienteSelecionadoId && clienteSelecionadoId !== "novo"
+          ? Number(clienteSelecionadoId)
+          : Date.now(),
+      nome: nomeCliente,
+      cnpj,
+      inscricaoEstadual,
+      endereco,
+      whatsapp,
+    };
+
+    if (pedidoEditandoId !== null) {
+      setPedidos((anterior) =>
+        anterior.map((pedido) =>
+          pedido.id === pedidoEditandoId
+            ? {
+                ...pedido,
+                numeroPedido: numeroPedidoCompleto,
+                dataEmissao: dataAtual,
+                vendedor,
+                cliente: clienteDoPedido,
+                itens,
+                parcelas,
+                total: totalGeral,
+              }
+            : pedido
+        )
+      );
+
+      alert("Pedido atualizado com sucesso.");
+      limparPedido();
+      setTela("pedidos");
+      return;
+    }
+
     const pedido: PedidoSalvo = {
       id: Date.now(),
       numeroPedido: numeroPedidoCompleto,
       dataEmissao: dataAtual,
       vendedor,
-      cliente: {
-        id:
-          clienteSelecionadoId && clienteSelecionadoId !== "novo"
-            ? Number(clienteSelecionadoId)
-            : Date.now(),
-        nome: nomeCliente,
-        cnpj,
-        inscricaoEstadual,
-        endereco,
-        whatsapp,
-      },
+      cliente: clienteDoPedido,
       itens,
       parcelas,
       total: totalGeral,
@@ -641,7 +704,7 @@ export default function Home() {
               Entrar
             </button>
           </div>
-                </div>
+        </div>
       </main>
     );
   }
@@ -660,7 +723,10 @@ export default function Home() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setTela("menu")}
+                onClick={() => {
+                  limparPedido();
+                  setTela("menu");
+                }}
                 className="rounded-lg bg-gray-200 px-4 py-2 font-semibold"
               >
                 Menu
@@ -682,7 +748,10 @@ export default function Home() {
 
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <button
-                  onClick={() => setTela("novo-pedido")}
+                  onClick={() => {
+                    limparPedido();
+                    setTela("novo-pedido");
+                  }}
                   className="rounded-2xl bg-white p-6 text-left shadow transition hover:-translate-y-1"
                 >
                   <h3 className="text-xl font-bold">Cadastrar novo pedido</h3>
@@ -933,12 +1002,13 @@ export default function Home() {
                       <th className="py-2">Vendedor</th>
                       <th className="py-2">Criado por</th>
                       <th className="py-2">Valor total</th>
+                      <th className="py-2 text-center">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pedidosVisiveis.length === 0 ? (
                       <tr>
-                        <td className="py-3" colSpan={6}>
+                        <td className="py-3" colSpan={7}>
                           Nenhum pedido encontrado.
                         </td>
                       </tr>
@@ -951,6 +1021,19 @@ export default function Home() {
                           <td className="py-2">{pedido.vendedor}</td>
                           <td className="py-2">{pedido.criadoPorNome}</td>
                           <td className="py-2">{moeda(pedido.total)}</td>
+                          <td className="py-2">
+                            <div className="flex justify-center">
+                              {(usuarioLogado.tipo === "admin" ||
+                                usuarioLogado.id === pedido.criadoPorId) && (
+                                <button
+                                  onClick={() => editarPedido(pedido)}
+                                  className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700"
+                                >
+                                  Ver / Editar
+                                </button>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -963,7 +1046,23 @@ export default function Home() {
           {tela === "novo-pedido" && (
             <section className="space-y-6">
               <div className="rounded-2xl bg-white p-6 shadow">
-                <h2 className="mb-4 text-2xl font-bold">Dados do pedido</h2>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-2xl font-bold">
+                    {pedidoEditandoId !== null ? "Editar pedido" : "Dados do pedido"}
+                  </h2>
+
+                  {pedidoEditandoId !== null && (
+                    <button
+                      onClick={() => {
+                        limparPedido();
+                        setTela("pedidos");
+                      }}
+                      className="rounded-lg bg-gray-500 px-4 py-2 font-semibold text-white"
+                    >
+                      Cancelar edição
+                    </button>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div>
@@ -1348,7 +1447,7 @@ export default function Home() {
                     onClick={salvarPedido}
                     className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white"
                   >
-                    Salvar pedido
+                    {pedidoEditandoId !== null ? "Atualizar pedido" : "Salvar pedido"}
                   </button>
 
                   <button
@@ -1368,30 +1467,22 @@ export default function Home() {
         <section className="mx-auto mt-6 max-w-[1000px] bg-white p-5 shadow print:max-w-none print:shadow-none">
           <div className="mb-5 border-b pb-4">
             <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img src="/logo.png" className="h-12" alt="Logo" />
 
-  <div className="flex items-center gap-3">
-    <img src="/logo.png" className="h-12" />
+                <div className="text-[11px] leading-tight">
+                  <div className="font-bold text-sm">
+                    AGROPECUARIA LIMOEIRO E PILOES LTDA
+                  </div>
 
-    <div className="text-[11px] leading-tight">
-      <div className="font-bold text-sm">
-        AGROPECUARIA LIMOEIRO E PILOES LTDA
-      </div>
+                  <div>CNPJ: 46.272.036/0001-25 | IE: 0043338680040</div>
 
-      <div>
-        CNPJ: 46.272.036/0001-25 | IE: 0043338680040
-      </div>
+                  <div>RENASEM MG-16443/2022</div>
 
-      <div>
-        RENASEM MG-16443/2022
-      </div>
-
-      <div>
-        Fazenda Limoeiro e Pilões KM 76 – Guarda-Mor MG
-      </div>
-    </div>
-  </div>
-
-</div>
+                  <div>Fazenda Limoeiro e Pilões KM 76 – Guarda-Mor MG</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mb-4 grid grid-cols-2 border-y py-2 text-center">
