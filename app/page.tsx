@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
-
 type Role = "admin" | "usuario";
 
 type AppUser = {
@@ -1754,13 +1752,11 @@ export default function Home() {
           <div className="mb-5 border-b pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Image
-                  src="/logo.png"
-                  width={180}
-                  height={80}
-                  alt="Logo"
-                  priority
-                />
+                <img
+  src="/logo.png"
+  alt="Logo"
+  className="h-16 w-auto object-contain"
+/>
 
                 <div className="text-[11px] leading-tight">
                   <div className="font-bold text-sm">
